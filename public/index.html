@@ -13,12 +13,12 @@
     <script>
         var myConnector = tableau.makeConnector()
 
-        myConnector.getSchema = schemaCallback => {
+        myConnector.getSchema = function(schemaCallback) {
           var connectionData = JSON.parse(tableau.connectionData)
           schemaCallback(connectionData.schema)
         }
 
-        myConnector.getData = (table, doneCallback) => {
+        myConnector.getData = function(table, doneCallback) {
           var connectionData = JSON.parse(tableau.connectionData)
           table.appendRows(connectionData.table)
           doneCallback()
