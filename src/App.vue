@@ -89,7 +89,7 @@ export default {
       }
 
       const tableSchemas = this.schema.map(ts => ({
-        id: ts.name.replace(/ /g, '_'),
+        id: ts.name.replace(/[^\w]/g, '_'),
         columns: ts.columns.map(cs => this.parseColumnSchema(cs)),
       }))
 
@@ -100,11 +100,11 @@ export default {
           .map(r => {
             const mapped = {}
             for (let [alias, value] of Object.entries(r)) {
-              mapped[alias.replace(/ /g, '_')] = value
+              mapped[alias.replace(/[^\w]/g, '_')] = value
             }
             return mapped
           })
-        tables[name.replace(/ /g, '_')] = rows
+        tables[name.replace(/[^\w]/g, '_')] = rows
       }
 
       const connectionData = {
@@ -134,7 +134,7 @@ export default {
       const dataType = tableauTypes[type] || tableau.dataTypeEnum.string
 
       return {
-        id: name.replace(/ /g, '_'),
+        id: name.replace(/[^\w]/g, '_'),
         dataType,
       }
     }
