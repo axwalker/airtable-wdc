@@ -30,8 +30,8 @@
             <v-text-field
               v-model="schemaInput"
               :rules="[v => !!v || 'Item is required']"
-              label="Schema"
-              placeholder="Enter your airtable schema (Chrome extension: https://tinyurl.com/ych9l2fv)"
+              label="Schema (Chrome extension: https://tinyurl.com/ych9l2fv)"
+              placeholder="Enter your airtable schema"
               required
             />
           </v-flex>
