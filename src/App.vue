@@ -5,6 +5,7 @@
       <v-container fluid>
 
         <v-form v-model="airTableValid">
+
           <v-flex xs12>
             <v-text-field
               v-model="apiKey"
@@ -14,23 +15,35 @@
               required
             />
           </v-flex>
+
+          <v-flex xs12>
+            <v-text-field
+              v-model="base"
+              :rules="[v => !!v || 'Item is required']"
+              label="Base"
+              placeholder="Enter the Airtable base"
+              required
+            />
+          </v-flex>
+
+          <v-flex xs12>
+            <v-text-field
+              v-model="schemaInput"
+              :rules="[v => !!v || 'Item is required']"
+              label="Schema"
+              placeholder="Enter your airtable schema"
+              required
+            />
+          </v-flex>
+
           <v-btn
             :disabled="!airTableValid"
             @click="fetchAirTableData"
           >
-            Fetch your data
+            Load your airtable data
           </v-btn>
-        </v-form>
 
-        <v-form v-if="airTableDataLoaded" v-model="tableauValid">
-          <v-btn
-            :disabled="!tableauValid"
-            @click="makeTableauTables"
-          >
-            Send data to tableau
-          </v-btn>
         </v-form>
-
       </v-container>
     </v-content>
   </v-app>
@@ -45,13 +58,18 @@ export default {
 
   data () {
     return {
-      apiKey: 'key0XkybVzTXtWZYq',
+      apiKey: '',
+      base: '',
+      schemaInput: '',
       airTableValid: false,
-      airTableDataLoaded: false,
-      tableauValid: false,
-      bases: [],
-      allRecords: [],
+      allRecords: {},
     }
+  },
+
+  computed: {
+    schema() {
+      return JSON.parse(this.schemaInput)
+    },
   },
 
   methods: {
@@ -60,45 +78,66 @@ export default {
           endpointUrl: 'https://api.airtable.com',
           apiKey: this.apiKey,
       })
-      const base = airtable.base('app7Abi7yfxc4z2mD')
+      const base = airtable.base(this.base)
 
-      await base('Table 1').select({
-          // Selecting the first 3 records in Grid view:
-          maxRecords: 3,
-          view: "Grid view"
-      }).eachPage((records, fetchNextPage) => {
-        records = records.filter(r => r.fields)
-        this.allRecords = this.allRecords.concat(records)
-        fetchNextPage()
-      })
-      this.airTableDataLoaded = true
-    },
+      for (let { name } of this.schema) {
+        await base(name).select().eachPage((records, fetchNextPage) => {
+          records = records.filter(r => Object.keys(r.fields).length)
+          this.allRecords[name] = (this.allRecords[name] || []).concat(records)
+          fetchNextPage()
+        })
+      }
 
-    makeTableauTables() {
-      const cols = Object.keys(this.allRecords[0].fields).map(k => ({
-        id: k,
-        dataType: tableau.dataTypeEnum.string,
+      const tableSchemas = this.schema.map(ts => ({
+        id: ts.name.replace(/ /g, '_'),
+        columns: ts.columns.map(cs => this.parseColumnSchema(cs)),
       }))
 
-      const tableSchema = {
-          id: "table1",
-          alias: "First test table",
-          columns: cols
+      let tables = {}
+      for (let { name } of this.schema) {
+        const rows = this.allRecords[name]
+          .map(r => r.fields)
+          .map(r => {
+            const mapped = {}
+            for (let [alias, value] of Object.entries(r)) {
+              mapped[alias.replace(/ /g, '_')] = value
+            }
+            return mapped
+          })
+        tables[name.replace(/ /g, '_')] = rows
       }
-
-      const table = this.allRecords.map(r => r.fields)
 
       const connectionData = {
-        schema: [tableSchema],
-        table,
+        schema: tableSchemas,
+        tables,
       }
-
-      console.log(connectionData)
 
       tableau.connectionData = JSON.stringify(connectionData)
       tableau.connectionName = "AirTable Feed"
       tableau.submit()
     },
+
+    parseColumnSchema({name, type}) {
+      const tableauTypes = {
+        checkbox: tableau.dataTypeEnum.bool,
+        date: tableau.dataTypeEnum.date,
+        datetime: tableau.dataTypeEnum.date,
+        foreignKey: tableau.dataTypeEnum.string,
+        multiSelect: tableau.dataTypeEnum.string,
+        multilineText: tableau.dataTypeEnum.string,
+        multipleAttachment: tableau.dataTypeEnum.string,
+        select: tableau.dataTypeEnum.string,
+        text: tableau.dataTypeEnum.string,
+        number: tableau.dataTypeEnum.float,
+        rating: tableau.dataTypeEnum.float,
+      }
+      const dataType = tableauTypes[type] || tableau.dataTypeEnum.string
+
+      return {
+        id: name.replace(/ /g, '_'),
+        dataType,
+      }
+    }
   }
 }
 </script>
