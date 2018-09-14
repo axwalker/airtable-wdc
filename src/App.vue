@@ -20,7 +20,7 @@
             <v-text-field
               v-model="base"
               :rules="[v => !!v || 'Item is required']"
-              label="Base"
+              label="Base id"
               placeholder="Enter the Airtable base"
               required
             />
@@ -31,7 +31,7 @@
               v-model="schemaInput"
               :rules="[v => !!v || 'Item is required']"
               label="Schema"
-              placeholder="Enter your airtable schema"
+              placeholder="Enter your airtable schema (Chrome extension: https://tinyurl.com/ych9l2fv)"
               required
             />
           </v-flex>
