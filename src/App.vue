@@ -36,6 +36,15 @@
             />
           </v-flex>
 
+          <v-flex>
+            <v-text-field
+              :value="`${url}?${queryString}`"
+              label="URL to use later"
+              outline
+              disabled
+            ></v-text-field>
+          </v-flex>
+
           <v-btn
             :disabled="!airTableValid"
             @click="fetchAirTableData"
@@ -52,6 +61,16 @@
 <script>
 /* global tableau */
 import airtable from 'airtable'
+import JsonUrl from 'json-url'
+
+// workaround for this issue: https://github.com/masotime/json-url/issues/5
+import 'json-url/dist/browser/json-url-msgpack'
+import 'json-url/dist/browser/json-url-lzw'
+import 'json-url/dist/browser/json-url-lzma'
+import 'json-url/dist/browser/json-url-lzstring'
+import 'json-url/dist/browser/json-url-safe64'
+const lzma = JsonUrl('lzma')
+
 
 export default {
   name: 'App',
@@ -63,13 +82,42 @@ export default {
       schemaInput: '',
       airTableValid: false,
       allRecords: {},
+      url: [location.protocol, '//', location.host, location.pathname].join(''),
     }
   },
 
   computed: {
     schema() {
-      return JSON.parse(this.schemaInput)
+      return JSON.parse(this.schemaInput || '{}')
     },
+    queryString() {
+      return [['apiKey', this.apiKey], ['base', this.base], ['schema', this.schemaEncoded]]
+        .filter(pair => pair[1])
+        .map(([ key, value ]) => `${key}=${value}`)
+        .join('&')
+    }
+  },
+
+  asyncComputed: {
+    async schemaEncoded() {
+      if (this.schema.length) {
+        return await lzma.compress(this.schema)
+      }
+    },
+  },
+
+  async created() {
+    window.codec = JsonUrl
+    this.apiKey = getParameterByName('apiKey')
+    this.base = getParameterByName('base')
+    let schema = getParameterByName('schema')
+    if (schema) {
+      schema = await lzma.decompress(schema)
+      this.schemaInput = JSON.stringify(schema)
+    }
+    if (this.apiKey && this.base && this.schemaInput) {
+      this.fetchAirTableData()
+    }
   },
 
   methods: {
@@ -137,7 +185,17 @@ export default {
         id: name.replace(/[^\w]/g, '_'),
         dataType,
       }
-    }
+    },
   }
+}
+
+function getParameterByName(name, url) {
+  if (!url) url = window.location.href;
+  name = name.replace(/[\[\]]/g, '\\$&');
+  var regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)'),
+      results = regex.exec(url);
+  if (!results) return null;
+  if (!results[2]) return '';
+  return decodeURIComponent(results[2].replace(/\+/g, ' '));
 }
 </script>
