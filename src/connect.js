@@ -5,50 +5,59 @@ import airtable from 'airtable'
 window.myConnector = tableau.makeConnector()
 
 myConnector.getSchema = async function(schemaCallback) {
-  let { schema } = JSON.parse(tableau.connectionData)
+  let connectionData = JSON.parse(tableau.connectionData)
 
-  const tableSchemas = schema.map(ts => ({
+  const tableSchemas = connectionData.schema.map(ts => ({
     id: ts.name.replace(/[^\w]/g, '_'),
     columns: ts.columns.map(cs => parseColumnSchema(cs)),
   }))
-  
+
+  // Table names in tableau have had non-word characters removed, but we still
+  // need to find them in `getData` with their original name, so we pass
+  // through a name mapping to the next stage.
+  const tableMap = {}
+  connectionData.schema.forEach(ts => {
+    const corrected_name = ts.name.replace(/[^\w]/g, '_')
+    tableMap[corrected_name] = ts.name
+  })
+
+  connectionData = {
+    ...connectionData,
+    tableMap,
+  }
+
+  tableau.connectionData = JSON.stringify(connectionData)
   schemaCallback(tableSchemas)
 }
 
 myConnector.getData = async function(table, doneCallback) {
-  let { apiKey, base, schema } = JSON.parse(tableau.connectionData)
+  let { apiKey, base, tableMap } = JSON.parse(tableau.connectionData)
   airtable.configure({
     endpointUrl: 'https://api.airtable.com',
     apiKey: apiKey,
   })
   base = airtable.base(base)
-  const allRecords = {}
 
-  // TODO: don't get every table for every getData call - should only
-  // need to get the data for the table currently being used
-  for (let { name } of schema) {
-    await base(name).select().eachPage((records, fetchNextPage) => {
-      records = records.filter(r => Object.keys(r.fields).length)
-      allRecords[name] = (allRecords[name] || []).concat(records)
-      fetchNextPage()
+  // Get the original airtable name given the (possibly different) tableau name
+  const tableName = tableMap[table.tableInfo.id]
+  let allRecords = []
+  await base(tableName).select().eachPage((records, fetchNextPage) => {
+    records = records.filter(r => Object.keys(r.fields).length)
+    allRecords = allRecords.concat(records)
+    fetchNextPage()
+  })
+
+  const rows = allRecords
+    .map(r => r.fields)
+    .map(r => {
+      const mapped = {}
+      for (let [alias, value] of Object.entries(r)) {
+        mapped[alias.replace(/[^\w]/g, '_')] = value
+      }
+      return mapped
     })
-  }
 
-  let tables = {}
-  for (let { name } of schema) {
-    const rows = allRecords[name]
-      .map(r => r.fields)
-      .map(r => {
-        const mapped = {}
-        for (let [alias, value] of Object.entries(r)) {
-          mapped[alias.replace(/[^\w]/g, '_')] = value
-        }
-        return mapped
-      })
-    tables[name.replace(/[^\w]/g, '_')] = rows
-  }
-
-  table.appendRows(tables[table.tableInfo.id])
+  table.appendRows(rows)
   doneCallback()
 }
 
