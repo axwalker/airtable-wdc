@@ -60,7 +60,6 @@
 
 <script>
 /* global tableau */
-import airtable from 'airtable'
 import JsonUrl from 'json-url'
 
 // workaround for this issue: https://github.com/masotime/json-url/issues/5
@@ -81,7 +80,6 @@ export default {
       base: '',
       schemaInput: '',
       airTableValid: false,
-      allRecords: {},
       url: [location.protocol, '//', location.host, location.pathname].join(''),
     }
   },
@@ -115,76 +113,19 @@ export default {
       schema = await lzma.decompress(schema)
       this.schemaInput = JSON.stringify(schema)
     }
-    if (this.apiKey && this.base && this.schemaInput) {
-      this.fetchAirTableData()
-    }
   },
 
   methods: {
     async fetchAirTableData() {
-      airtable.configure({
-          endpointUrl: 'https://api.airtable.com',
-          apiKey: this.apiKey,
-      })
-      const base = airtable.base(this.base)
-
-      for (let { name } of this.schema) {
-        await base(name).select().eachPage((records, fetchNextPage) => {
-          records = records.filter(r => Object.keys(r.fields).length)
-          this.allRecords[name] = (this.allRecords[name] || []).concat(records)
-          fetchNextPage()
-        })
-      }
-
-      const tableSchemas = this.schema.map(ts => ({
-        id: ts.name.replace(/[^\w]/g, '_'),
-        columns: ts.columns.map(cs => this.parseColumnSchema(cs)),
-      }))
-
-      let tables = {}
-      for (let { name } of this.schema) {
-        const rows = this.allRecords[name]
-          .map(r => r.fields)
-          .map(r => {
-            const mapped = {}
-            for (let [alias, value] of Object.entries(r)) {
-              mapped[alias.replace(/[^\w]/g, '_')] = value
-            }
-            return mapped
-          })
-        tables[name.replace(/[^\w]/g, '_')] = rows
-      }
-
       const connectionData = {
-        schema: tableSchemas,
-        tables,
+        schema: this.schema,
+        apiKey: this.apiKey,
+        base: this.base,
       }
 
       tableau.connectionData = JSON.stringify(connectionData)
       tableau.connectionName = "AirTable Feed"
       tableau.submit()
-    },
-
-    parseColumnSchema({name, type}) {
-      const tableauTypes = {
-        checkbox: tableau.dataTypeEnum.bool,
-        date: tableau.dataTypeEnum.date,
-        datetime: tableau.dataTypeEnum.date,
-        foreignKey: tableau.dataTypeEnum.string,
-        multiSelect: tableau.dataTypeEnum.string,
-        multilineText: tableau.dataTypeEnum.string,
-        multipleAttachment: tableau.dataTypeEnum.string,
-        select: tableau.dataTypeEnum.string,
-        text: tableau.dataTypeEnum.string,
-        number: tableau.dataTypeEnum.float,
-        rating: tableau.dataTypeEnum.float,
-      }
-      const dataType = tableauTypes[type] || tableau.dataTypeEnum.string
-
-      return {
-        id: name.replace(/[^\w]/g, '_'),
-        dataType,
-      }
     },
   }
 }

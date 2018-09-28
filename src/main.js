@@ -2,6 +2,8 @@ import '@babel/polyfill'
 import Vue from 'vue'
 import AsyncComputed from 'vue-async-computed'
 import './plugins/vuetify'
+
+import './connect.js'
 import App from './App.vue'
 
 

@@ -16,22 +16,6 @@
     ></script>
   </head>
   <body>
-    <script>
-        var myConnector = tableau.makeConnector()
-
-        myConnector.getSchema = function(schemaCallback) {
-          var connectionData = JSON.parse(tableau.connectionData)
-          schemaCallback(connectionData.schema)
-        }
-
-        myConnector.getData = function(table, doneCallback) {
-          var connectionData = JSON.parse(tableau.connectionData)
-          table.appendRows(connectionData.tables[table.tableInfo.id])
-          doneCallback()
-        }
-
-        tableau.registerConnector(myConnector)
-    </script>
     <noscript>
       <strong>
         We're sorry but airtable-wdc doesn't work properly without JavaScript enabled.
